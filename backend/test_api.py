@@ -1,3 +1,15 @@
+"""
+Test script for the Hex to RGB Converter API
+"""
+from main import HexColorRequest, hex_to_rgb
+
+
+def test_hex_to_rgb():
+    """Test the hex_to_rgb function with various inputs."""
+    print("=" * 50)
+    print("Testing valid hex codes:")
+    print("=" * 50)
+    
     test_cases = [
         "#FF5733",
         "FF5733",
@@ -18,6 +30,7 @@
 
     print("\n" + "=" * 50)
     print("Testing invalid hex codes:")
+    print("=" * 50)
 
     invalid_cases = [
         "GGGGGG",  # Invalid characters
@@ -33,19 +46,12 @@
             print(f"Hex: {hex_code:8} -> RGB: {rgb}")
         except Exception as e:
             print(f"Hex: {hex_code:8} -> Error: {type(e).__name__}")
+    
+    print("\n" + "=" * 50)
+    print("All tests completed!")
+    print("=" * 50)
+
 
 if __name__ == "__main__":
     test_hex_to_rgb()
-#!/bin/bash
-# Script to run the FastAPI application
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Run the application
-echo "Starting FastAPI Hex to RGB Converter..."
-echo "Server will be available at: http://localhost:8000"
-echo "API Documentation at: http://localhost:8000/docs"
-echo ""
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 

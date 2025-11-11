@@ -60,9 +60,16 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "/convert": "POST - Convert hex color to RGB",
-            "/convert/{hex_code}": "GET - Convert hex color to RGB via URL"
+            "/convert/{hex_code}": "GET - Convert hex color to RGB via URL",
+            "/health": "GET - Health check endpoint"
         }
     }
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "healthy"}
 
 
 @app.post("/convert", response_model=RGBColorResponse)
