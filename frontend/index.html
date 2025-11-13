@@ -220,7 +220,7 @@
     </div>
 
     <script>
-        const API_URL = 'http://localhost:8000';
+        const API_URL = window.location.protocol + '//' + window.location.hostname + ':8000';
 
         // Allow Enter key to trigger conversion
         document.getElementById('hexInput').addEventListener('keypress', function(e) {
