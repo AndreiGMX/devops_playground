@@ -1,0 +1,44 @@
+name: Destroy Terraform Infrastructure
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./terraform
+    
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    # Configure AWS Credentials
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-north-1  # Stockholm - matches your main.tf
+    
+    # Install the latest version of Terraform CLI
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+    
+    # Initialize a new or existing Terraform working directory
+    - name: Terraform Init
+      run: terraform init
+    
+    # Generates a destruction plan for Terraform
+    - name: Terraform Plan Destroy
+      run: terraform plan -destroy -out=tfplan-destroy
+    
+    # Destroy the Terraform-managed infrastructure
+    - name: Terraform Destroy
+      run: terraform apply -auto-approve tfplan-destroy
