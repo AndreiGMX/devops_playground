@@ -1,0 +1,123 @@
+name: Continuous Deployment
+
+# Trigger: Run after CI workflow completes successfully on main branch
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    # Only deploy if CI succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    # Get EC2 IP from Terraform state
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-north-1
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_wrapper: false
+    
+    - name: Get EC2 IP from Terraform
+      id: get_ip
+      working-directory: ./terraform
+      run: |
+        terraform init
+        EC2_IP=$(terraform output -raw instance_public_ip)
+        echo "ec2_host=$EC2_IP" >> $GITHUB_OUTPUT
+        echo "EC2 IP: $EC2_IP"
+    
+    # Step 1: Copy docker-compose.prod.yml to EC2
+    - name: Copy docker-compose file to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ steps.get_ip.outputs.ec2_host }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        port: 22
+        source: "docker-compose.prod.yml"
+        target: "/opt/app/"
+    
+    # Step 2: SSH into EC2 and deploy
+    - name: Deploy application via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ steps.get_ip.outputs.ec2_host }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          cd /opt/app
+          
+          # Pull latest images from GHCR
+          echo "Pulling latest images..."
+          docker-compose -f docker-compose.prod.yml pull
+          
+          # Stop and remove old containers
+          echo "Stopping old containers..."
+          docker-compose -f docker-compose.prod.yml down
+          
+          # Start new containers
+          echo "Starting new containers..."
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # Show running containers
+          echo "Deployment complete! Running containers:"
+          docker ps
+          
+          # Cleanup old images to save space
+          echo "Cleaning up old images..."
+          docker image prune -f
+    
+    # Step 3: Verify deployment
+    - name: Health check
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ steps.get_ip.outputs.ec2_host }}
+        username: ubuntu
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        port: 22
+        script: |
+          # Wait for services to start
+          sleep 10
+          
+          # Check backend health
+          echo "Checking backend health..."
+          curl -f http://localhost:8000/health || exit 1
+          
+          # Check frontend
+          echo "Checking frontend..."
+          curl -f http://localhost:8080 || exit 1
+          
+          echo "✅ All services are healthy!"
+    
+    # Step 4: Notify on failure (optional)
+    - name: Deployment Status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "## ✅ Deployment Succeeded!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** http://${{ steps.get_ip.outputs.ec2_host }}:8080" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend API:** http://${{ steps.get_ip.outputs.ec2_host }}:8000/health" >> $GITHUB_STEP_SUMMARY
+          echo "**EC2 Instance:** ${{ steps.get_ip.outputs.ec2_host }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Deployment failed!"
+          exit 1
+        fi
