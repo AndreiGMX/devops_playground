@@ -3,7 +3,7 @@ name: Continuous Deployment
 # Trigger: Run after CI workflow completes successfully on main branch
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["Continuous Integration"]
     types:
       - completed
     branches:
