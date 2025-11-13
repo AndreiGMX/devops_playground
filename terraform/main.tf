@@ -81,7 +81,7 @@ resource "aws_instance" "web_server" {
   # Associate the security group
   vpc_security_group_ids = [aws_security_group.instance_sg.id]
 
-  # Cloud-init script to install Docker, Docker Compose, and run the application
+  # Cloud-init script to install Docker and Docker Compose only
   user_data = <<-EOF
               #!/bin/bash
               # Update and install prerequisites
@@ -91,8 +91,7 @@ resource "aws_instance" "web_server" {
                   ca-certificates \
                   curl \
                   gnupg \
-                  lsb-release \
-                  git
+                  lsb-release
 
               # Add Docker's official GPG key
               curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -111,12 +110,12 @@ resource "aws_instance" "web_server" {
               curl -L "https://github.com/docker/compose/releases/download/$${LATEST_COMPOSE}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
               chmod +x /usr/local/bin/docker-compose
 
-              # Clone the repository
-              git clone https://github.com/AndreiGMX/devops_playground.git /home/ubuntu/devops_playground
+              # Add ubuntu user to docker group
+              usermod -aG docker ubuntu
 
-              # Run docker-compose
-              cd /home/ubuntu/devops_playground
-              /usr/local/bin/docker-compose up -d
+              # Create directory for application deployment
+              mkdir -p /opt/app
+              chown ubuntu:ubuntu /opt/app
               EOF
 
   tags = {
