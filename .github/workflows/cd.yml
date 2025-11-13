@@ -39,6 +39,7 @@ jobs:
       working-directory: ./terraform
       run: |
         terraform init
+        terraform refresh -input=false
         EC2_IP=$(terraform output -raw instance_public_ip)
         echo "ec2_host=$EC2_IP" >> $GITHUB_OUTPUT
         echo "EC2 IP: $EC2_IP"
