@@ -123,3 +123,9 @@ resource "aws_instance" "web_server" {
     Environment = var.environment
   }
 }
+
+# Output the public IP address
+output "instance_public_ip" {
+  description = "Public IP address of the EC2 instance"
+  value       = aws_instance.web_server.public_ip
+}

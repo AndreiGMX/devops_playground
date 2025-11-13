@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/andreigmx/devops-playground-backend:main
+    ports:
+      - "8000:8000"
+    container_name: backend-app
+    restart: unless-stopped
+    environment:
+      - ENV=production
+
+  frontend:
+    image: ghcr.io/andreigmx/devops-playground-frontend:main
+    ports:
+      - "8080:80"
+    container_name: frontend-app
+    restart: unless-stopped
+    depends_on:
+      - backend
