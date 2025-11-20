@@ -220,7 +220,8 @@
     </div>
 
     <script>
-        const API_URL = window.location.protocol + '//' + window.location.hostname + ':8000';
+        // Use relative path - NGINX will proxy /api/ to the backend service
+        const API_URL = '/api';
 
         // Allow Enter key to trigger conversion
         document.getElementById('hexInput').addEventListener('keypress', function(e) {
