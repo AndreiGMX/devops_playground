@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 4.0"
+      version = "~> 5.0"
     }
     tls = {
       source = "hashicorp/tls"
@@ -37,10 +37,64 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# VPC
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "main-vpc"
+    Environment = var.environment
+  }
+}
+
+# Internet Gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "main-igw"
+    Environment = var.environment
+  }
+}
+
+# Subnet
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet"
+    Environment = var.environment
+  }
+}
+
+# Route Table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "public-rt"
+    Environment = var.environment
+  }
+}
+
+# Route Table Association
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
 # Security group to allow SSH and HTTP traffic
 resource "aws_security_group" "instance_sg" {
   name        = "instance-sg"
   description = "Allow SSH and custom HTTP traffic"
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     description = "SSH from anywhere"
@@ -85,6 +139,7 @@ resource "aws_instance" "web_server" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t3.micro"
   key_name      = "devops play"
+  subnet_id     = aws_subnet.public.id
 
   # Associate the security group
   vpc_security_group_ids = [aws_security_group.instance_sg.id]
@@ -132,8 +187,19 @@ resource "aws_instance" "web_server" {
   }
 }
 
+# Elastic IP for the instance
+resource "aws_eip" "web_server" {
+  instance = aws_instance.web_server.id
+  domain   = "vpc"
+
+  tags = {
+    Name = "web-server-eip"
+    Environment = var.environment
+  }
+}
+
 # Output the public IP address
 output "instance_public_ip" {
   description = "Public IP address of the EC2 instance"
-  value       = aws_instance.web_server.public_ip
+  value       = aws_eip.web_server.public_ip
 }
