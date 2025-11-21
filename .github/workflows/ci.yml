@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: write  # <--- ADD THIS LINE (Allows the job to cancel itself)
     
     steps:
     - name: Checkout code
@@ -30,6 +31,16 @@ jobs:
             - 'backend/**'
           frontend:
             - 'frontend/**'
+      
+    - name: Stop workflow if nothing changed
+      # Run this if BOTH backend and frontend are 'false'
+      if: steps.changes.outputs.backend == 'false' && steps.changes.outputs.frontend == 'false'
+      run: |
+        echo "⛔ No changes in backend or frontend. Cancelling workflow to skip CD."
+        gh run cancel ${{ github.run_id }}
+        sleep 30 # Wait for the cancellation to process
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set up Python
       if: steps.changes.outputs.backend == 'true'
