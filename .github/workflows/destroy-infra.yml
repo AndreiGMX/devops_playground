@@ -8,37 +8,71 @@ jobs:
     name: 'Terraform Destroy'
     runs-on: ubuntu-latest
     
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:
       run:
         shell: bash
         working-directory: ./terraform
     
     steps:
-    # Checkout the repository to the GitHub Actions runner
     - name: Checkout
       uses: actions/checkout@v4
     
-    # Configure AWS Credentials
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-north-1  # Stockholm - matches your main.tf
-    
-    # Install the latest version of Terraform CLI
+        aws-region: eu-north-1
+
+    - name: Install AWS CLI
+      run: |
+        sudo apt-get update && sudo apt-get install -y unzip curl
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "aarch64" ]; then
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+        else
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        fi
+        unzip -q awscliv2.zip && sudo ./aws/install --update
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    # ROBUST CLEANUP STEP
+    - name: Cleanup K8s Load Balancers
+      working-directory: . 
+      run: |
+        echo "Checking if EKS Cluster exists..."
+        
+        # Check if cluster exists before trying to connect
+        if ! aws eks describe-cluster --name my-app-cluster >/dev/null 2>&1; then
+          echo "⚠️ Cluster 'my-app-cluster' not found. Skipping Kubernetes cleanup."
+          echo "Ensure you have manually deleted ALBs if the cluster was partially destroyed."
+          exit 0
+        fi
+
+        echo "Cluster found. Connecting..."
+        aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
+        
+        echo "Deleting Ingress resources..."
+        kubectl delete ingress --all --all-namespaces --timeout=5m || true
+        
+        echo "Deleting LoadBalancer services..."
+        kubectl delete svc --all --all-namespaces --field-selector spec.type=LoadBalancer --timeout=5m || true
+        
+        echo "Waiting 2 minutes for AWS to remove ALBs..."
+        sleep 120
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
     
-    # Initialize a new or existing Terraform working directory
     - name: Terraform Init
       run: terraform init
     
-    # Generates a destruction plan for Terraform
     - name: Terraform Plan Destroy
       run: terraform plan -destroy -out=tfplan-destroy
     
-    # Destroy the Terraform-managed infrastructure
     - name: Terraform Destroy
       run: terraform apply -auto-approve tfplan-destroy

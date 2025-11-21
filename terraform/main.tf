@@ -4,12 +4,28 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.11"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.4"
+    }
     tls = {
-      source = "hashicorp/tls"
+      source  = "hashicorp/tls"
       version = "~> 4.0"
     }
   }
 }
+
+# -----------------------------------------------------------------------------
+# Variables
+# -----------------------------------------------------------------------------
 
 variable "environment" {
   description = "The deployment environment (e.g., dev, prod)."
@@ -17,189 +33,226 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "region" {
+  description = "AWS Region"
+  type        = string
+  default     = "eu-north-1"
+}
+
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "my-app-cluster"
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+# -----------------------------------------------------------------------------
+# Providers
+# -----------------------------------------------------------------------------
+
 provider "aws" {
-  region = "eu-north-1" # Stockholm
+  region = var.region
 }
 
-# Data source to get the latest Ubuntu 20.04 AMI in the specified region
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical's owner ID
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
 
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
 
-# VPC
-resource "aws_vpc" "main" {
-  cidr_block = "10.0.0.0/16"
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Networking (VPC)
+# -----------------------------------------------------------------------------
+
+data "aws_availability_zones" "available" {}
+
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "${var.cluster_name}-vpc"
+  cidr = var.vpc_cidr
+
+  azs             = slice(data.aws_availability_zones.available.names, 0, 3)
+  private_subnets = [for k, v in slice(data.aws_availability_zones.available.names, 0, 3) : cidrsubnet(var.vpc_cidr, 4, k)]
+  public_subnets  = [for k, v in slice(data.aws_availability_zones.available.names, 0, 3) : cidrsubnet(var.vpc_cidr, 4, k + 4)]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_hostnames = true
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = 1
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = 1
+  }
 
   tags = {
-    Name = "main-vpc"
     Environment = var.environment
   }
 }
 
-# Internet Gateway
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
+# -----------------------------------------------------------------------------
+# EKS Cluster
+# -----------------------------------------------------------------------------
+
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 19.0"
+
+  cluster_name    = var.cluster_name
+  cluster_version = "1.28"
+
+  vpc_id                         = module.vpc.vpc_id
+  subnet_ids                     = module.vpc.private_subnets
+  cluster_endpoint_public_access = true
+
+  eks_managed_node_groups = {
+    default = {
+      min_size     = 1
+      max_size     = 5
+      desired_size = 4
+
+      # UPDATED: Changed to t3.micro to satisfy Free Tier requirement
+      instance_types = ["t3.micro"] 
+      capacity_type  = "ON_DEMAND"
+    }
+  }
+
+  manage_aws_auth_configmap = true
+
+  aws_auth_users = [
+    # 1. The Pipeline User (Keep this so CI/CD keeps working)
+    {
+      userarn  = "arn:aws:iam::544584096688:user/github-actions-user"
+      username = "github-actions-user"
+      groups   = ["system:masters"]
+    },
+    # 2. Your Root User (ADD THIS BLOCK)
+    {
+      userarn  = "arn:aws:iam::544584096688:root"
+      username = "root-admin"
+      groups   = ["system:masters"]
+    }
+  ]
 
   tags = {
-    Name = "main-igw"
     Environment = var.environment
   }
 }
 
-# Subnet
-resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
+# -----------------------------------------------------------------------------
+# AWS Load Balancer Controller - IAM & Roles
+# -----------------------------------------------------------------------------
 
-  tags = {
-    Name = "public-subnet"
-    Environment = var.environment
+data "http" "lb_controller_policy" {
+  url = "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.5.4/docs/install/iam_policy.json"
+}
+
+resource "aws_iam_policy" "lb_controller" {
+  name        = "${var.cluster_name}-AWSLoadBalancerControllerIAMPolicy"
+  path        = "/"
+  description = "IAM Policy for AWS Load Balancer Controller"
+  policy      = data.http.lb_controller_policy.response_body
+}
+
+module "lb_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name                              = "${var.cluster_name}-lb-controller"
+  attach_load_balancer_controller_policy = false
+  
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+    }
   }
 }
 
-# Route Table
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-
-  tags = {
-    Name = "public-rt"
-    Environment = var.environment
-  }
+resource "aws_iam_role_policy_attachment" "lb_controller_attach" {
+  role       = module.lb_role.iam_role_name
+  policy_arn = aws_iam_policy.lb_controller.arn
 }
 
-# Route Table Association
-resource "aws_route_table_association" "public" {
-  subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public.id
+# -----------------------------------------------------------------------------
+# AWS Load Balancer Controller - Helm Installation
+# -----------------------------------------------------------------------------
+
+resource "helm_release" "aws_load_balancer_controller" {
+  name       = "aws-load-balancer-controller"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-load-balancer-controller"
+  namespace  = "kube-system"
+  version    = "1.6.2"
+
+  set {
+    name  = "clusterName"
+    value = module.eks.cluster_name
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  set {
+    name  = "serviceAccount.name"
+    value = "aws-load-balancer-controller"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = module.lb_role.iam_role_arn
+  }
+
+  depends_on = [
+    module.eks,
+    module.lb_role
+  ]
 }
 
-# Security group to allow SSH and HTTP traffic
-resource "aws_security_group" "instance_sg" {
-  name        = "instance-sg"
-  description = "Allow SSH and custom HTTP traffic"
-  vpc_id      = aws_vpc.main.id
+# -----------------------------------------------------------------------------
+# Outputs
+# -----------------------------------------------------------------------------
 
-  ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTP on port 8080 from anywhere"
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Backend API on port 8000 from anywhere"
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow all outbound traffic
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "allow_ssh_http_8080"
-    Environment = var.environment
-  }
+output "cluster_endpoint" {
+  description = "Endpoint for EKS control plane"
+  value       = module.eks.cluster_endpoint
 }
 
-# EC2 Instance definition
-resource "aws_instance" "web_server" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = "t3.micro"
-  key_name      = "devops play"
-  subnet_id     = aws_subnet.public.id
-
-  # Associate the security group
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
-
-  # Cloud-init script to install Docker and Docker Compose only
-  user_data = <<-EOF
-              #!/bin/bash
-              # Update and install prerequisites
-              apt-get update -y
-              apt-get install -y \
-                  apt-transport-https \
-                  ca-certificates \
-                  curl \
-                  gnupg \
-                  lsb-release
-
-              # Add Docker's official GPG key
-              curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-              # Set up the stable repository
-              echo \
-                "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-                $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-              # Install Docker Engine
-              apt-get update -y
-              apt-get install -y docker-ce docker-ce-cli containerd.io
-
-              # Install Docker Compose
-              LATEST_COMPOSE=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-              curl -L "https://github.com/docker/compose/releases/download/$${LATEST_COMPOSE}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              chmod +x /usr/local/bin/docker-compose
-
-              # Add ubuntu user to docker group
-              usermod -aG docker ubuntu
-
-              # Create directory for application deployment
-              mkdir -p /opt/app
-              chown ubuntu:ubuntu /opt/app
-              EOF
-
-  tags = {
-    Name = "WebServerInstance"
-    Environment = var.environment
-  }
+output "configure_kubectl" {
+  description = "Command to update kubeconfig"
+  value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
 
-# Elastic IP for the instance
-resource "aws_eip" "web_server" {
-  instance = aws_instance.web_server.id
-  domain   = "vpc"
-
-  tags = {
-    Name = "web-server-eip"
-    Environment = var.environment
-  }
-}
-
-# Output the public IP address
-output "instance_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_eip.web_server.public_ip
+output "load_balancer_controller_role_arn" {
+  description = "The ARN of the IAM role created for the Load Balancer Controller"
+  value       = module.lb_role.iam_role_arn
 }

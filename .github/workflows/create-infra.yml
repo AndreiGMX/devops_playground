@@ -8,37 +8,51 @@ jobs:
     name: 'Terraform'
     runs-on: ubuntu-latest
     
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
     defaults:
       run:
         shell: bash
         working-directory: ./terraform
     
     steps:
-    # Checkout the repository to the GitHub Actions runner
     - name: Checkout
       uses: actions/checkout@v4
     
-    # Configure AWS Credentials
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-north-1  # Stockholm - matches your main.tf
-    
-    # Install the latest version of Terraform CLI
+        aws-region: eu-north-1
+
+    # NEW STEP: Install AWS CLI (Required for Helm Provider authentication)
+    - name: Install AWS CLI
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y unzip curl
+        
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "aarch64" ]; then
+          echo "🍎 Detected ARM64 (Apple Silicon) - Downloading ARM installer..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+        else
+          echo "💻 Detected x86_64 (Intel/AMD) - Downloading Standard installer..."
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        fi
+        
+        unzip -q awscliv2.zip
+        sudo ./aws/install --update
+        aws --version
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
     
-    # Initialize a new or existing Terraform working directory
     - name: Terraform Init
       run: terraform init
     
-    # Generates an execution plan for Terraform
     - name: Terraform Plan
       run: terraform plan -out=tfplan
     
-    # Apply the Terraform plan
     - name: Terraform Apply
+      # 'idempotent' means we can run this multiple times safely.
+      # It will see the Cluster exists and just try to add the Helm chart.
       run: terraform apply -auto-approve tfplan

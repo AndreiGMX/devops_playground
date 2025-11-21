@@ -3,14 +3,28 @@ kind: Ingress
 metadata:
   name: app-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      rewrite ^/api/(.*) /$1 break;
+    # Tell AWS to create an Internet-facing Load Balancer
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    
+    # 'ip' mode routes traffic directly to pods (faster/efficient on EKS)
+    alb.ingress.kubernetes.io/target-type: ip
+    
+    # Health check settings (Optional, but good practice)
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    
+    # Listen on HTTP port 80
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
 spec:
-  ingressClassName: nginx
+  # Use the AWS Load Balancer Controller
+  ingressClassName: alb
   rules:
   - http:
       paths:
+      # Route EVERYTHING to the frontend. 
+      # The NGINX inside your frontend container will handle 
+      # routing /api/ requests to the backend-service internally.
       - path: /
         pathType: Prefix
         backend:
@@ -18,10 +32,3 @@ spec:
             name: frontend-service
             port:
               number: 80
-      - path: /api/
-        pathType: Prefix
-        backend:
-          service:
-            name: backend-service
-            port:
-              number: 8000
