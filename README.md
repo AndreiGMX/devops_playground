@@ -1,5 +1,20 @@
 # DevOps Playground
 
+## Table of Contents
+
+- [🚀 What is This Project?](#-what-is-this-project)
+- [📱 The Application](#-the-application)
+- [🎯 Why This App for DevOps?](#-why-this-app-for-devops)
+- [🛤️ Learning Journey](#️-learning-journey)
+- [📚 What You'll Learn](#-what-youll-learn)
+- [📖 Documentation](#-documentation)
+- [🏁 Getting Started](#-getting-started)
+- [☁️ Cloud Deployment (AWS EKS + Kubernetes)](#️-cloud-deployment-aws-eks--kubernetes)
+- [📚 Architecture & Technologies](#-architecture--technologies)
+- [🌟 Current Status](#-current-status)
+- [🤝 Contributing](#-contributing)
+- [📝 License](#-license)
+
 ## 🚀 What is This Project?
 
 **DevOps Playground** is a hands-on learning platform designed to teach you DevOps practices from the ground up. This project uses a simple but complete web application as the foundation to learn real-world DevOps tools and workflows.
@@ -45,40 +60,6 @@ This playground follows a progressive roadmap (see `ROADMAP.md`) that takes you 
 4. **Phase 4**: Continuous Deployment (CD) to cloud infrastructure
 5. **Phase 5**: Kubernetes orchestration and advanced DevOps practices
 
-## 🏁 Getting Started
-
-### Prerequisites
-- Python 3.10+
-- Docker (optional for local development, required for DevOps learning)
-- Git and GitHub account
-
-### Quick Start (Local Development)
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/AndreiGMX/devops_playground.git
-   cd devops_playground
-   ```
-
-2. **Run the backend**
-   ```bash
-   cd backend
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python main.py
-   ```
-   Backend will be available at `http://localhost:8000`
-
-3. **Open the frontend**
-   ```bash
-   # In a new terminal
-   cd frontend
-   # Open index.html in your browser or use a simple HTTP server
-   python3 -m http.server 8080
-   ```
-   Frontend will be available at `http://localhost:8080`
-
 ## 📚 What You'll Learn
 
 Through this playground, you'll gain hands-on experience with:
@@ -98,23 +79,107 @@ Through this playground, you'll gain hands-on experience with:
 - `ROADMAP.md` - Complete DevOps learning roadmap
 - `backend/QUICKSTART.md` - Quick reference for running the backend
 
-## 🌟 Current Status
+## 🏁 Getting Started
 
-**Branch**: phase2_CI  
-**Current Focus**: Implementing Continuous Integration with GitHub Actions
+### ✅ Prerequisites
 
-## 🤝 Contributing
+- **Local:** Docker & Docker Compose
+- **Cloud:** An AWS account and a GitHub repository
 
-This is a learning project! Feel free to:
+### ⚡ Quick Start (Local Development)
+
+#### Option A — Docker Compose (recommended)
+
+```bash
+# Clone the repo
+git clone https://github.com/AndreiGMX/devops_playground.git
+cd devops_playground
+
+# Build and start services
+docker-compose up --build
+```
+
+- Frontend: `http://localhost:8080`
+- Backend API (Swagger): `http://localhost:8000/docs`
+
+#### Option B — Run services locally (Python venv)
+
+```bash
+# Backend
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+
+# Frontend (in a new terminal)
+cd frontend
+python3 -m http.server 8080
+```
+
+### ☁️ Cloud Deployment (AWS EKS + Kubernetes)
+
+- This repository supports a full GitOps-style deployment to AWS using Terraform + GitHub Actions.
+
+#### Step A — Configure GitHub Actions secrets
+
+- In your GitHub repository go to: Settings → Secrets and variables → Actions, then add:
+
+   - `AWS_ACCESS_KEY_ID` — your AWS access key
+   - `AWS_SECRET_ACCESS_KEY` — your AWS secret key
+
+- (Required AWS permissions: EC2, EKS, IAM, VPC)
+
+#### Step B — Provision infrastructure (Terraform)
+
+- Automated Provisioning: The infrastructure pipeline detects changes specifically in the `/terraform` directory.
+
+- To create or update infrastructure (VPC, EKS cluster, IAM roles), simply push changes to the `/terraform` folder on the main branch.
+
+- The workflow will automatically run terraform apply.
+
+- Note: First-time setup takes approx. 10–20 minutes.
+
+#### Step C — Deploy application (CI/CD)
+
+- Push a change to `main` (or merge a PR). The CI workflow is now optimized with smart path filtering:
+   - **Targeted Triggers:** The workflow executes automatically when changes are detected specifically in the `/backend` or `/frontend` directories.
+   - **Conditional Builds:** By analyzing the full git history diff, the pipeline determines exactly which component changed. It will only build and push the Docker image for the modified component (Backend or Frontend) to `ghcr.io`, saving time and resources.
+- The CD workflow updates kubeconfig, applies manifests from `/kubernetes`, and restarts deployments to pull new images.
+- After deployment, check the CD workflow logs for the **Get Ingress Address** step to find your Load Balancer URL.
+
+#### Step D — Cleanup
+
+- To avoid AWS charges, run the **Destroy Terraform Infrastructure** workflow from the Actions tab.
+
+### 📚 Architecture & Technologies
+
+- **IaC:** Terraform (EKS, VPC, IAM)
+- **Orchestration:** Kubernetes (Deployments, Services, Ingress)
+- **Ingress:** AWS ALB (Application Load Balancer) Controller
+- **CI/CD:** GitHub Actions
+- **Registry:** GitHub Container Registry (`ghcr.io`)
+
+### 🌟 Current Status
+
+- Phase Completed: ✅ Phase 5 — Kubernetes
+
+We have a cloud-native pipeline from local development to automated infrastructure provisioning and deployment:
+
+- ✅ Containerized: Dockerfiles for frontend and backend
+- ✅ CI: Automated build & test workflows (with conditional builds & path filtering)
+- ✅ IaC: Terraform scripts to create EKS and networking
+- ✅ CD: GitHub Actions apply Kubernetes manifests
+- ✅ Ingress: ALB-managed traffic entry
+
+### 🤝 Contributing
+
+This is a learning project — contributions welcome:
+
 - Fork the repository
-- Experiment with different DevOps tools
-- Share your improvements
-- Create issues for questions or suggestions
+- Experiment with Helm charts or ArgoCD
+- Open issues for questions or suggestions
 
-## 📝 License
+### 📝 License
 
-This project is designed for educational purposes.
-
----
-
-**Ready to start your DevOps journey?** Check out the `ROADMAP.md` file and begin with Phase 1! 🚀
+This project is intended for educational purposes.

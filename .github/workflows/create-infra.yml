@@ -2,6 +2,11 @@ name: Create Terraform Infrastructure
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
 
 jobs:
   terraform:
