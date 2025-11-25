@@ -8,7 +8,7 @@ backend:
     repository: ghcr.io/andreigmx/devops-playground-backend
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "main"
+    tag: "latest"
   service:
     type: ClusterIP
     port: 8000
@@ -26,7 +26,7 @@ frontend:
     repository: ghcr.io/andreigmx/devops-playground-frontend
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "main"
+    tag: "latest"
   service:
     type: ClusterIP
     port: 80
