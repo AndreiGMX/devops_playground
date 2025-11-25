@@ -50,34 +50,36 @@ jobs:
       with:
         version: 'latest'
 
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+
     - name: Update Kubeconfig
       run: |
         aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
 
-    # 2. Deploy Manifests (Updated for 'kubernetes' folder)
-    - name: Deploy Manifests
-      working-directory: ./kubernetes  # <--- Set context to the folder
+    # Deploy using Helm
+    - name: Deploy with Helm
       run: |
-        echo "Applying Kubernetes manifests..."
-        kubectl apply -f backend-service.yaml
-        kubectl apply -f frontend-service.yaml
-        kubectl apply -f backend-deployment.yaml
-        kubectl apply -f frontend-deployment.yaml
-        kubectl apply -f ingress.yaml
-
-    # 3. Force Restart (Does not need working-directory as it uses resource names)
-    - name: Force Image Pull (Rollout Restart)
-      run: |
-        echo "Restarting deployments to pull the latest images..."
-        kubectl rollout restart deployment/backend-deployment
-        kubectl rollout restart deployment/frontend-deployment
+        echo "Deploying application using Helm..."
+        helm upgrade --install devops-playground ./charts/devops-playground \
+          --namespace devops-playground \
+          --create-namespace \
+          --wait \
+          --timeout 5m
 
     - name: Verify Deployment
       run: |
-        echo "Waiting for rollout to complete..."
-        kubectl rollout status deployment/backend-deployment
-        kubectl rollout status deployment/frontend-deployment
+        echo "Checking Helm release status..."
+        helm list -n devops-playground
+        
+        echo "Waiting for pods to be ready..."
+        kubectl wait --for=condition=ready pod -l app=backend -n devops-playground --timeout=300s
+        kubectl wait --for=condition=ready pod -l app=frontend -n devops-playground --timeout=300s
+        
         echo "✅ Deployment successful!"
+        kubectl get all -n devops-playground
 
     # 4. Get Ingress Address (New Step)
     - name: Get Ingress Address
@@ -85,14 +87,14 @@ jobs:
         echo "🌐 Retrieving Ingress URL..."
         
         # Display the full ingress table in the logs
-        kubectl get ingress
+        kubectl get ingress -n devops-playground
         
         # Attempt to extract the specific hostname/IP for the summary
-        INGRESS_HOST=$(kubectl get ingress -o jsonpath='{.items[*].status.loadBalancer.ingress[*].hostname}')
+        INGRESS_HOST=$(kubectl get ingress -n devops-playground -o jsonpath='{.items[*].status.loadBalancer.ingress[*].hostname}')
         
         # Fallback for IP based ingress if hostname is empty
         if [ -z "$INGRESS_HOST" ]; then
-            INGRESS_HOST=$(kubectl get ingress -o jsonpath='{.items[*].status.loadBalancer.ingress[*].ip}')
+            INGRESS_HOST=$(kubectl get ingress -n devops-playground -o jsonpath='{.items[*].status.loadBalancer.ingress[*].ip}')
         fi
 
         # Output to GitHub Actions Summary
