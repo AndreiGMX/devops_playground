@@ -139,7 +139,7 @@ module "eks" {
       desired_size = 4
 
       # UPDATED: Changed to t3.micro to satisfy Free Tier requirement
-      instance_types = ["t3.micro"] 
+      instance_types = ["t3.micro"]
       capacity_type  = "ON_DEMAND"
     }
   }
@@ -153,7 +153,7 @@ module "eks" {
       username = "github-actions-user"
       groups   = ["system:masters"]
     },
-    # 2. Your Root User (ADD THIS BLOCK)
+    # 2. Your Root User
     {
       userarn  = "arn:aws:iam::544584096688:root"
       username = "root-admin"
@@ -187,7 +187,7 @@ module "lb_role" {
 
   role_name                              = "${var.cluster_name}-lb-controller"
   attach_load_balancer_controller_policy = false
-  
+
   oidc_providers = {
     main = {
       provider_arn               = module.eks.oidc_provider_arn

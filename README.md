@@ -19,6 +19,26 @@
 
 **DevOps Playground** is a hands-on learning platform designed to teach you DevOps practices from the ground up. This project uses a simple but complete web application as the foundation to learn real-world DevOps tools and workflows.
 
+## 🏗️ Project Structure
+
+> [!IMPORTANT]
+> **This project has been split into multiple repositories.**
+
+This repository (**devops_playground**) is now dedicated to **GitOps, Infrastructure, and Helm Charts**. The application source code has been moved to separate repositories to simulate a real-world microservices environment.
+
+### 🔗 Repositories
+
+| Component | Repository URL | Description |
+|-----------|----------------|-------------|
+| **Infrastructure** | [Current Repo](https://github.com/AndreiGMX/devops_playground) | Terraform, Helm Charts, GitOps Workflows |
+| **Backend** | [devops_playground_backend](https://github.com/AndreiGMX/devops_playground_backend.git) | FastAPI Application Source Code |
+| **Frontend** | [devops_playground_frontend](https://github.com/AndreiGMX/devops_playground_frontend.git) | HTML/JS Frontend Source Code |
+
+### 🔄 CI/CD Workflow
+1. **Development**: Changes are pushed to the Backend or Frontend repositories.
+2. **CI**: Each repo has its own CI pipeline that builds and pushes Docker images to GHCR.
+3. **CD (This Repo)**: This repository manages the deployment. When changes are pushed to `main` here (e.g., updating Helm values), the CD workflow deploys the new infrastructure/configuration to AWS EKS.
+
 ## 📱 The Application
 
 At its core, this is a **Hex to RGB Color Converter** web application consisting of:
