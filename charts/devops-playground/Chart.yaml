@@ -1,6 +1,17 @@
 apiVersion: v2
 name: devops-playground
-description: A Helm chart for the DevOps Playground application
+description: A Helm chart for Kubernetes
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+
+dependencies:
+  - name: backend
+    version: "0.1.0"
+    repository: "file://../backend"
+  - name: frontend
+    version: "0.1.0"
+    repository: "file://../frontend"
+  - name: network
+    version: "0.1.0"
+    repository: "file://../network"

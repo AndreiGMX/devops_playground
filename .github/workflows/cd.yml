@@ -56,6 +56,10 @@ jobs:
       run: |
         aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
 
+    - name: Build Helm Dependencies
+      run: |
+        helm dependency build ./charts/devops-playground
+
     # Deploy using Helm
     - name: Deploy with Helm
       run: |

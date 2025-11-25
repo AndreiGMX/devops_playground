@@ -16,5 +16,7 @@
 **/__pycache__/
 *.pyc
 
-# GitHub Actions local run artifacts
-*_workflow_run_event.json
+# Helm
+charts/*/charts/
+charts/*/Chart.lock
+*.tgz

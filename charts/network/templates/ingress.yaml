@@ -1,20 +1,20 @@
-{{- if .Values.ingress.enabled -}}
+{{- if .Values.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}-ingress
   labels:
     app.kubernetes.io/instance: {{ .Release.Name }}
-  {{- with .Values.ingress.annotations }}
+  {{- with .Values.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if .Values.ingress.className }}
-  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.className }}
+  ingressClassName: {{ .Values.className }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
+    {{- range .Values.hosts }}
     - {{- if .host }}
       host: {{ .host | quote }}
       {{- end }}
@@ -25,9 +25,9 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: frontend-service
+                name: {{ .serviceName }}
                 port:
-                  number: {{ $.Values.frontend.service.port }}
+                  number: {{ .servicePort }}
           {{- end }}
     {{- end }}
 {{- end }}
