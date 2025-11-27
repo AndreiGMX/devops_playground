@@ -21,4 +21,4 @@ spec:
         tag: ghcr.io/andreigmx/devops-playground-backend:main-decba144685161f7dd34ccfa4c0d61de97fe0fa2 # {"$imagepolicy": "flux-system:backend"}
     frontend:
       image:
-        tag: ghcr.io/andreigmx/devops-playground-frontend:latest # {"$imagepolicy": "flux-system:frontend"}
+        tag: ghcr.io/andreigmx/devops-playground-frontend:v1.0.7 # {"$imagepolicy": "flux-system:frontend"}
