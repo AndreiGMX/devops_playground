@@ -21,4 +21,4 @@ spec:
         tag: v1.0.3 # {"$imagepolicy": "flux-system:backend:tag"}
     frontend:
       image:
-        tag: v1.0.7 # {"$imagepolicy": "flux-system:frontend:tag"}
+        tag: v1.0.8 # {"$imagepolicy": "flux-system:frontend:tag"}
