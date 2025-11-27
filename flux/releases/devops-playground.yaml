@@ -18,7 +18,7 @@ spec:
   values:
     backend:
       image:
-        tag: latest  # {"$imagepolicy": "flux-system:backend"}
+        tag: ghcr.io/andreigmx/devops-playground-backend:main-decba144685161f7dd34ccfa4c0d61de97fe0fa2 # {"$imagepolicy": "flux-system:backend"}
     frontend:
       image:
-        tag: latest  # {"$imagepolicy": "flux-system:frontend"}
+        tag: ghcr.io/andreigmx/devops-playground-frontend:main-e941f99fe009a40108f52c52493542721e924ba4 # {"$imagepolicy": "flux-system:frontend"}
