@@ -48,6 +48,12 @@ jobs:
         sudo ./aws/install --update
         aws --version
 
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+        kubectl version --client
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
     
@@ -55,9 +61,13 @@ jobs:
       run: terraform init
     
     - name: Terraform Plan
+      env:
+        TF_VAR_github_token: ${{ secrets.GH_PAT }}
       run: terraform plan -out=tfplan
     
     - name: Terraform Apply
       # 'idempotent' means we can run this multiple times safely.
       # It will see the Cluster exists and just try to add the Helm chart.
+      env:
+        TF_VAR_github_token: ${{ secrets.GH_PAT }}
       run: terraform apply -auto-approve tfplan

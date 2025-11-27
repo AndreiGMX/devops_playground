@@ -5,28 +5,42 @@ This guide walks you through deploying the application using Flux CD after the i
 ## Prerequisites
 
 - ✅ AWS EKS cluster created via Terraform
-- ✅ Flux CD installed on the cluster (via Terraform)
-- ✅ `kubectl` configured to access the cluster
+- ✅ Flux CD installed on the cluster### 1. Apply Terraform Changes (Automated)
 
-## Step-by-Step Deployment
+We have automated the Flux installation and bootstrapping process in Terraform.
 
-### 1. Configure kubectl
+**Prerequisite:** You need a GitHub Personal Access Token (PAT) with `repo` permissions.
 
 ```bash
-# Update kubeconfig to connect to your EKS cluster
-aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
+cd terraform
 
-# Verify connection
-kubectl get nodes
+# Export your GitHub PAT as an environment variable
+export TF_VAR_github_token="ghp_your_token_here"
+
+# Initialize and Apply
+terraform init
+terraform apply
 ```
 
-### 2. Verify Flux Installation
+### 2. GitHub Actions (Automated CI/CD)
 
-```bash
-# Check that Flux components are running
-kubectl get pods -n flux-system
+If you use the included GitHub Actions workflow (`.github/workflows/create-infra.yml`), you must:
 
-# Expected output: All pods should be Running
+1.  Go to your GitHub Repository **Settings** > **Secrets and variables** > **Actions**.
+2.  Create a **New repository secret**.
+3.  Name: `GH_PAT`
+4.  Value: Your GitHub Personal Access Token (with `repo` scope).
+
+The workflow will automatically inject this token into Terraform to bootstrap Flux.
+
+**What happens automatically:**
+1.  **Installs Flux CD** components on the cluster.
+2.  **Creates the `flux-git-auth` secret** using your token.
+3.  **Bootstraps Flux** by applying the manifest files (`flux/sources/git-repository.yaml` and `flux/sync.yaml`).
+
+> **Note**: You no longer need to manually run `kubectl apply` for the Flux manifests or manually create the secret!
+
+### 2. Verify Deploymentput: All pods should be Running
 # - source-controller
 # - kustomize-controller
 # - helm-controller

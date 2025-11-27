@@ -296,3 +296,50 @@ output "verify_flux" {
   description = "Command to verify Flux CD installation"
   value       = "kubectl get pods -n flux-system"
 }
+
+# -----------------------------------------------------------------------------
+# Flux CD - Bootstrap Automation
+# -----------------------------------------------------------------------------
+
+variable "github_token" {
+  description = "GitHub Personal Access Token (PAT) for Flux CD authentication"
+  type        = string
+  sensitive   = true
+}
+
+resource "kubernetes_secret" "flux_git_auth" {
+  metadata {
+    name      = "flux-git-auth"
+    namespace = "flux-system"
+  }
+
+  data = {
+    username = "git"
+    password = var.github_token
+  }
+
+  type = "Opaque"
+
+  depends_on = [
+    helm_release.flux
+  ]
+}
+
+resource "null_resource" "flux_bootstrap" {
+  depends_on = [
+    helm_release.flux,
+    kubernetes_secret.flux_git_auth
+  ]
+
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}
+      kubectl apply -f ${path.module}/../flux/sources/git-repository.yaml
+      kubectl apply -f ${path.module}/../flux/sync.yaml
+    EOT
+  }
+}

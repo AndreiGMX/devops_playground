@@ -43,11 +43,18 @@ flux/
 ### Step 1: Apply Flux Manifests
 
 ```bash
-# Apply in order
-kubectl apply -f flux/sync.yaml
-kubectl apply -f flux/sources/
-kubectl apply -f flux/releases/
-kubectl apply -f flux/image-automation/
+# Apply via Terraform (Automated)
+# Export your GitHub PAT
+export TF_VAR_github_token="ghp_your_token_here"
+
+# Apply Terraform
+cd terraform
+terraform apply
+
+# This will automatically:
+# 1. Install Flux
+# 2. Create the authentication secret
+# 3. Apply the manifests below
 ```
 
 ### Step 2: Verify Installation
