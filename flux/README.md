@@ -6,6 +6,7 @@ This directory contains all Flux CD manifests for GitOps-based continuous deploy
 
 ```
 flux/
+├── sync.yaml             # Kustomization to sync git to cluster
 ├── sources/              # Source repositories
 │   └── git-repository.yaml          # GitRepository for this repo
 ├── releases/             # Helm releases
@@ -43,6 +44,7 @@ flux/
 
 ```bash
 # Apply in order
+kubectl apply -f flux/sync.yaml
 kubectl apply -f flux/sources/
 kubectl apply -f flux/releases/
 kubectl apply -f flux/image-automation/
