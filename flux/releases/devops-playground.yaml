@@ -1,0 +1,24 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: devops-playground
+  namespace: flux-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ./charts/devops-playground
+      sourceRef:
+        kind: GitRepository
+        name: devops-playground-charts
+      interval: 1m
+  targetNamespace: devops-playground
+  install:
+    createNamespace: true
+  values:
+    backend:
+      image:
+        tag: latest  # {"$imagepolicy": "flux-system:backend"}
+    frontend:
+      image:
+        tag: latest  # {"$imagepolicy": "flux-system:frontend"}

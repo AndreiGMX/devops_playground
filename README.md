@@ -37,7 +37,7 @@ This repository (**devops_playground**) is now dedicated to **GitOps, Infrastruc
 ### 🔄 CI/CD Workflow
 1. **Development**: Changes are pushed to the Backend or Frontend repositories.
 2. **CI**: Each repo has its own CI pipeline that builds and pushes Docker images to GHCR.
-3. **CD (This Repo)**: This repository manages the deployment. When changes are pushed to `main` here (e.g., updating Helm values), the CD workflow deploys the new infrastructure/configuration to AWS EKS.
+3. **CD (Flux CD)**: Flux CD automatically monitors GHCR for new images and updates deployments on the EKS cluster without manual intervention.
 
 ## 📱 The Application
 
@@ -160,13 +160,57 @@ python3 -m http.server 8080
 
 - Note: First-time setup takes approx. 10–20 minutes.
 
-#### Step C — Deploy application (CI/CD)
+#### Step C — Deploy application (Flux CD)
 
-- Push a change to `main` (or merge a PR). The CI workflow is now optimized with smart path filtering:
-   - **Targeted Triggers:** The workflow executes automatically when changes are detected specifically in the `/backend` or `/frontend` directories.
-   - **Conditional Builds:** By analyzing the full git history diff, the pipeline determines exactly which component changed. It will only build and push the Docker image for the modified component (Backend or Frontend) to `ghcr.io`, saving time and resources.
-- The CD workflow updates kubeconfig, applies manifests from `/kubernetes`, and restarts deployments to pull new images.
-- After deployment, check the CD workflow logs for the **Get Ingress Address** step to find your Load Balancer URL.
+**Initial Setup:**
+
+1. **Configure kubectl:**
+   ```bash
+   # Update kubeconfig to connect to your EKS cluster
+   aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
+   ```
+   
+   > **Note**: Since your GHCR images are public, no authentication secret is required.
+
+2. **Apply Flux Manifests:**
+   ```bash
+   # Apply all Flux CD manifests
+   kubectl apply -f flux/sources/
+   kubectl apply -f flux/releases/
+   kubectl apply -f flux/image-automation/
+   ```
+
+3. **Verify Flux Installation:**
+   ```bash
+   # Check Flux components
+   kubectl get pods -n flux-system
+   
+   # Check if HelmRelease is ready
+   kubectl get helmrelease -n flux-system
+   
+   # Check application pods
+   kubectl get pods -n devops-playground
+   ```
+
+**Automated Deployments:**
+
+Once set up, Flux CD will:
+- Monitor GHCR for new backend/frontend images every minute
+- Automatically update the HelmRelease manifest when new images are detected
+- Commit the changes back to this repository
+- Deploy the updated application to the cluster
+
+You can monitor the automation:
+```bash
+# Watch image repositories
+kubectl get imagerepository -n flux-system
+
+# Watch for image updates
+kubectl logs -n flux-system deployment/image-reflector-controller -f
+
+# Check the ingress URL
+kubectl get ingress -n devops-playground
+```
 
 #### Step D — Cleanup
 
@@ -175,21 +219,23 @@ python3 -m http.server 8080
 ### 📚 Architecture & Technologies
 
 - **IaC:** Terraform (EKS, VPC, IAM)
-- **Orchestration:** Kubernetes (Deployments, Services, Ingress)
+- **Orchestration:** Kubernetes (Helm Charts, Deployments, Services, Ingress)
+- **GitOps:** Flux CD (Automated image updates and deployments)
 - **Ingress:** AWS ALB (Application Load Balancer) Controller
-- **CI/CD:** GitHub Actions
+- **CI:** GitHub Actions (in backend/frontend repos)
 - **Registry:** GitHub Container Registry (`ghcr.io`)
 
 ### 🌟 Current Status
 
-- Phase Completed: ✅ Phase 5 — Kubernetes
+- Phase Completed: ✅ Phase 5 — Kubernetes + GitOps
 
-We have a cloud-native pipeline from local development to automated infrastructure provisioning and deployment:
+We have a cloud-native GitOps pipeline from local development to automated infrastructure provisioning and deployment:
 
 - ✅ Containerized: Dockerfiles for frontend and backend
-- ✅ CI: Automated build & test workflows (with conditional builds & path filtering)
+- ✅ CI: Automated build & test workflows in separate repos
 - ✅ IaC: Terraform scripts to create EKS and networking
-- ✅ CD: GitHub Actions apply Kubernetes manifests
+- ✅ GitOps: Flux CD for automated deployments and image updates
+- ✅ Helm: Umbrella chart structure with subcharts
 - ✅ Ingress: ALB-managed traffic entry
 
 ### 🤝 Contributing
@@ -197,7 +243,7 @@ We have a cloud-native pipeline from local development to automated infrastructu
 This is a learning project — contributions welcome:
 
 - Fork the repository
-- Experiment with Helm charts or ArgoCD
+- Experiment with Flux CD configurations or Helm charts
 - Open issues for questions or suggestions
 
 ### 📝 License

@@ -1,53 +1,29 @@
-# Default values for devops-playground.
+# Default values for devops-playground umbrella chart.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Values for the backend subchart
 backend:
   replicaCount: 1
   image:
-    repository: ghcr.io/andreigmx/devops-playground-backend
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
     tag: "latest"
   service:
-    type: ClusterIP
     port: 8000
-  resources: {}
-    # limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    # requests:
-    #   cpu: 100m
-    #   memory: 128Mi
 
+# Values for the frontend subchart
 frontend:
   replicaCount: 1
   image:
-    repository: ghcr.io/andreigmx/devops-playground-frontend
-    pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
     tag: "latest"
   service:
-    type: ClusterIP
     port: 80
-  resources: {}
-    # limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    # requests:
-    #   cpu: 100m
-    #   memory: 128Mi
 
-ingress:
+# Values for the network subchart
+network:
   enabled: true
-  className: "alb"
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
   hosts:
     - paths:
         - path: /
           pathType: Prefix
+          serviceName: frontend-service
+          servicePort: 80
