@@ -7,9 +7,5 @@ spec:
   imageRepositoryRef:
     name: frontend
   policy:
-    alphabetical:
-      order: asc
-  # Alternative policy for semantic versioning:
-  # policy:
-  #   semver:
-  #     range: '>=1.0.0'
+    semver:
+      range: '>=1.0.0'
