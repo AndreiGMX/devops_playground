@@ -138,8 +138,8 @@ module "eks" {
       max_size     = 5
       desired_size = 4
 
-      # UPDATED: Changed to t3.micro to satisfy Free Tier requirement
-      instance_types = ["t3.micro"]
+      # UPDATED: Changed to t3.small to satisfy Free Tier requirement
+      instance_types = ["t3.small"]
       capacity_type  = "ON_DEMAND"
     }
   }
@@ -239,6 +239,36 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 # -----------------------------------------------------------------------------
+# Flux CD - GitOps Continuous Delivery
+# -----------------------------------------------------------------------------
+
+resource "helm_release" "flux" {
+  name       = "flux2"
+  repository = "https://fluxcd-community.github.io/helm-charts"
+  chart      = "flux2"
+  namespace  = "flux-system"
+  version    = "2.12.0"
+
+  create_namespace = true
+
+  # Enable image automation components for automatic image updates
+  set {
+    name  = "imageAutomationController.create"
+    value = "true"
+  }
+
+  set {
+    name  = "imageReflectorController.create"
+    value = "true"
+  }
+
+  depends_on = [
+    module.eks,
+    helm_release.aws_load_balancer_controller
+  ]
+}
+
+# -----------------------------------------------------------------------------
 # Outputs
 # -----------------------------------------------------------------------------
 
@@ -255,4 +285,14 @@ output "configure_kubectl" {
 output "load_balancer_controller_role_arn" {
   description = "The ARN of the IAM role created for the Load Balancer Controller"
   value       = module.lb_role.iam_role_arn
+}
+
+output "flux_namespace" {
+  description = "Namespace where Flux CD is installed"
+  value       = helm_release.flux.namespace
+}
+
+output "verify_flux" {
+  description = "Command to verify Flux CD installation"
+  value       = "kubectl get pods -n flux-system"
 }

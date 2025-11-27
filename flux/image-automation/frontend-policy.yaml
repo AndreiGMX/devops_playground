@@ -1,0 +1,15 @@
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: frontend
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: frontend
+  policy:
+    alphabetical:
+      order: asc
+  # Alternative policy for semantic versioning:
+  # policy:
+  #   semver:
+  #     range: '>=1.0.0'
