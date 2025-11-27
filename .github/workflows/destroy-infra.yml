@@ -72,7 +72,11 @@ jobs:
       run: terraform init
     
     - name: Terraform Plan Destroy
+      env:
+        TF_VAR_github_token: "placeholder"  # Not used during destroy, but required for validation
       run: terraform plan -destroy -out=tfplan-destroy
     
     - name: Terraform Destroy
+      env:
+        TF_VAR_github_token: "placeholder"
       run: terraform apply -auto-approve tfplan-destroy
