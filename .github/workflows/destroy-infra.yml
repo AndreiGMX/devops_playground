@@ -65,6 +65,32 @@ jobs:
         echo "Waiting 2 minutes for AWS to remove ALBs..."
         sleep 120
 
+    # MANUAL FLUX CLEANUP (prevents Terraform timeout)
+    - name: Remove Flux CD
+      working-directory: .
+      run: |
+        echo "Checking if cluster exists..."
+        if ! aws eks describe-cluster --name my-app-cluster >/dev/null 2>&1; then
+          echo "⚠️ Cluster not found. Skipping Flux cleanup."
+          exit 0
+        fi
+        
+        echo "Connecting to cluster..."
+        aws eks update-kubeconfig --region eu-north-1 --name my-app-cluster
+        
+        echo "Deleting Flux resources..."
+        kubectl delete helmrelease --all -n flux-system --timeout=2m || true
+        kubectl delete kustomization --all -n flux-system --timeout=2m || true
+        
+        echo "Uninstalling Flux Helm release..."
+        helm uninstall flux2 -n flux-system --timeout=2m || true
+        
+        echo "Deleting flux-system namespace..."
+        kubectl delete namespace flux-system --timeout=2m || true
+        
+        echo "Waiting 30s for cleanup..."
+        sleep 30
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
     
